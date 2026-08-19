@@ -76,7 +76,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">B</span><span>Bolu Aderoju<span>Initiative</span></span></div>
+        <div className="brand"><span className="brand-mark">N</span><span>Bolu Aderoju<span> Initiative</span></span></div>
         <button className="logout" onClick={logout}>Log out</button>
       </header>
 

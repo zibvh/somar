@@ -7,9 +7,31 @@ const jwt = require("jsonwebtoken");
 const app = express();
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || "change-this-secret-in-production";
-const DB_FILE = path.join(__dirname, "db.json");
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) console.warn("MONGODB_URI is not set. Add it in Render Environment Variables.");
 
-app.use(express.json());
+const mongoose = require("mongoose");
+const crypto = require("crypto");
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  passwordHash: { type: String, required: true },
+  completed: { type: Boolean, default: false },
+  score: { type: Number, default: null },
+  completedAt: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const responseSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, unique: true, ref: "User" },
+  answers: { type: [Number], required: true },
+  score: { type: Number, required: true },
+  submittedAt: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model("User", userSchema);
+const SurveyResponse = mongoose.model("SurveyResponse", responseSchema);
 
 const survey = [
   { id: 1, question: "In what year did Nigeria gain independence from Britain?", options: ["1957", "1960", "1963", "1970"], answer: 1 },
@@ -52,46 +74,51 @@ function auth(req, res, next) {
 }
 
 app.post("/api/auth/register", async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password || password.length < 6)
-    return res.status(400).json({ message: "Enter a name, valid email and password of at least 6 characters." });
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password || password.length < 6)
+      return res.status(400).json({ message: "Enter a name, valid email and password of at least 6 characters." });
 
-  const db = readDb();
-  if (db.users.some(u => u.email.toLowerCase() === email.toLowerCase()))
-    return res.status(409).json({ message: "An account with that email already exists." });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) return res.status(409).json({ message: "An account with that email already exists." });
 
-  const user = {
-    id: crypto.randomUUID(),
-    name: name.trim(),
-    email: email.trim().toLowerCase(),
-    passwordHash: await bcrypt.hash(password, 10),
-    completed: false,
-    score: null,
-    createdAt: new Date().toISOString()
-  };
-  db.users.push(user);
-  writeDb(db);
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      passwordHash: await bcrypt.hash(password, 10)
+    });
 
-  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, completed: false, score: null } });
+    const token = jwt.sign({ id: user._id.toString(), email: user.email, name: user.name }, JWT_SECRET, { expiresIn: "7d" });
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email, completed: false, score: null } });
+  } catch (e) {
+    if (e.code === 11000) return res.status(409).json({ message: "An account with that email already exists." });
+    res.status(500).json({ message: "Could not create your account." });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-  const db = readDb();
-  const user = db.users.find(u => u.email === String(email || "").toLowerCase());
-  if (!user || !(await bcrypt.compare(password || "", user.passwordHash)))
-    return res.status(401).json({ message: "Incorrect email or password." });
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email: String(email || "").trim().toLowerCase() });
+    if (!user || !(await bcrypt.compare(password || "", user.passwordHash)))
+      return res.status(401).json({ message: "Incorrect email or password." });
 
-  const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, completed: user.completed, score: user.score } });
+    const token = jwt.sign({ id: user._id.toString(), email: user.email, name: user.name }, JWT_SECRET, { expiresIn: "7d" });
+    res.json({ token, user: { id: user._id, name: user.name, email: user.email, completed: user.completed, score: user.score } });
+  } catch {
+    res.status(500).json({ message: "Could not sign you in." });
+  }
 });
 
-app.get("/api/me", auth, (req, res) => {
-  const db = readDb();
-  const user = db.users.find(u => u.id === req.user.id);
-  if (!user) return res.status(404).json({ message: "User not found" });
-  res.json({ id: user.id, name: user.name, email: user.email, completed: user.completed, score: user.score });
+app.get("/api/me", auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ id: user._id, name: user.name, email: user.email, completed: user.completed, score: user.score });
+  } catch {
+    res.status(401).json({ message: "Session expired" });
+  }
 });
 
 app.get("/api/survey", auth, (req, res) => {
@@ -102,37 +129,44 @@ app.get("/api/survey", auth, (req, res) => {
   });
 });
 
-app.post("/api/survey/submit", auth, (req, res) => {
-  const { answers } = req.body;
-  if (!Array.isArray(answers) || answers.length !== survey.length)
-    return res.status(400).json({ message: "Please answer every question before submitting." });
+app.post("/api/survey/submit", auth, async (req, res) => {
+  try {
+    const { answers } = req.body;
+    if (!Array.isArray(answers) || answers.length !== survey.length)
+      return res.status(400).json({ message: "Please answer every question before submitting." });
 
-  const db = readDb();
-  const user = db.users.find(u => u.id === req.user.id);
-  if (!user) return res.status(404).json({ message: "User not found" });
-  if (user.completed) return res.status(409).json({ message: "This survey has already been completed." });
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (user.completed) return res.status(409).json({ message: "This survey has already been completed." });
 
-  const score = survey.reduce((total, q, i) => total + (Number(answers[i]) === q.answer ? 1 : 0), 0);
-  user.completed = true;
-  user.score = score;
-  user.completedAt = new Date().toISOString();
+    const score = survey.reduce((total, q, i) => total + (Number(answers[i]) === q.answer ? 1 : 0), 0);
+    const completedAt = new Date();
 
-  db.responses.push({
-    id: crypto.randomUUID(),
-    userId: user.id,
-    answers,
-    score,
-    submittedAt: user.completedAt
-  });
-  writeDb(db);
+    await SurveyResponse.create({
+      userId: user._id,
+      answers: answers.map(Number),
+      score,
+      submittedAt: completedAt
+    });
 
-  res.json({
-    message: "Survey completed successfully.",
-    score,
-    total: survey.length,
-    rewardUnlocked: true,
-    rewardAmount: 200000
-  });
+    user.completed = true;
+    user.score = score;
+    user.completedAt = completedAt;
+    await user.save();
+
+    res.json({
+      message: "Survey completed successfully.",
+      score,
+      total: survey.length,
+      rewardUnlocked: true,
+      rewardAmount: 200000
+    });
+  } catch (e) {
+    if (e.code === 11000)
+      return res.status(409).json({ message: "This survey has already been submitted." });
+    console.error(e);
+    res.status(500).json({ message: "Could not submit the survey. Please try again." });
+  }
 });
 
 const dist = path.join(__dirname, "..", "dist");
@@ -141,4 +175,12 @@ if (fs.existsSync(dist)) {
   app.get("*splat", (req, res) => res.sendFile(path.join(dist, "index.html")));
 }
 
-app.listen(PORT, () => console.log(`Survey app running on port ${PORT}`));
+mongoose.connect(MONGODB_URI)
+  .then(() => {
+    console.log("Connected to MongoDB");
+    app.listen(PORT, () => console.log(`Bolu Aderoju Initiative survey app running on port ${PORT}`));
+  })
+  .catch(err => {
+    console.error("MongoDB connection failed:", err.message);
+    process.exit(1);
+  });
