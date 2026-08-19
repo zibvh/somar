@@ -25,7 +25,7 @@ function App() {
     const r = await fetch(`${API}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(body ?? {})
+      body: JSON.stringify(body)
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.message || "Something went wrong");
@@ -125,8 +125,7 @@ function Dashboard({ user, openSurvey, error }) {
       <section className="balance-card">
         <div className="balance-top"><span>RESEARCH REWARD</span><span className="status-dot">●</span></div>
         <div className="balance">₦{completed ? "200,000" : "0"}</div>
-        <p>{completed ? "Reward eligibility unlocked" : "Complete the survey to unlock reward eligibility"}</p>
-        {completed && <a className="claim-btn" href={`https://paystack.shop/pay/boluaderoju?email=${encodeURIComponent(user.email)}&first_name=${encodeURIComponent(user.name.split(" ")[0])}`} target="_blank" rel="noopener noreferrer">Claim reward →</a>}
+        <p>{completed ? "Reward unlocked after survey completion" : "Complete the survey to unlock the reward"}</p>
       </section>
 
       <section className="quick-actions">
@@ -193,6 +192,14 @@ function Result({ user, result }) {
       <section className="score-card">
         <span>Your survey score</span><strong>{result?.score ?? user.score}/20</strong>
       </section>
+      <div className="refresh-cta">
+        <div className="refresh-icon">↻</div>
+        <div>
+          <strong>Refresh your dashboard</strong>
+          <p>Your survey has been submitted. Refresh to see your updated reward status.</p>
+        </div>
+        <button className="refresh-btn" onClick={() => window.location.reload()}>Refresh now</button>
+      </div>
       <p className="notice">This screen records eligibility for the configured study reward. Actual disbursement should be handled through the approved grant/payment process.</p>
     </main>
   );

@@ -1,18 +1,32 @@
-# Bolu Aderoju Initiative Survey
+# Naija History Survey
 
-MongoDB-backed participant survey app for Render.
+Mobile-first participant survey web app designed for Render.
 
-## Render environment
-MONGODB_URI=your MongoDB Atlas URI
-JWT_SECRET=your long random secret
+## Features
+- Account registration and login
+- JSON file database (`server/db.json`)
+- JWT authentication
+- Bank-app-inspired participant dashboard
+- 20 Nigerian history questions
+- One-time survey submission
+- ₦200,000 study-reward eligibility shown after completion
+- No admin dashboard included yet
 
-Build: `npm install && npm run build`
-Start: `npm start`
+## Local
+```bash
+npm install
+npm run dev
+```
 
-Health check: `/api/health`
+## Render
+Create a Web Service from this project.
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`
+- Add environment variable: `JWT_SECRET` with a long random value.
 
-The survey submission endpoint explicitly parses JSON before routes and safely handles missing request bodies, fixing the Render error:
-`Cannot destructure property 'answers' of 'req.body' as it is undefined`.
+### Important JSON database limitation
+`server/db.json` is intentionally used as requested. On many Render services, the local filesystem is ephemeral, so data can be lost when the service is redeployed/restarted. For a real survey with thousands of participants, move the same data layer to persistent storage before launch.
 
-The participant reward claim button opens the initiative Paystack Payment Page:
-https://paystack.shop/pay/boluaderoju
+### Reward wording
+The ₦200,000 amount is presented as a configured research reward/eligibility amount, not as an actual bank balance or a promise of automatic withdrawal. Connect the approved grant disbursement process separately.
+"# somar" 
