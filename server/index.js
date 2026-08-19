@@ -136,23 +136,25 @@ app.post("/api/survey/submit", auth, async (req, res) => {
       return res.status(400).json({ message: "Please answer every question before submitting." });
 
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "Your account could not be found. Please log out and sign in again." });
     if (user.completed) return res.status(409).json({ message: "This survey has already been completed." });
 
-    const score = survey.reduce((total, q, i) => total + (Number(answers[i]) === q.answer ? 1 : 0), 0);
+    const numericAnswers = answers.map(Number);
+    const score = survey.reduce((total, q, i) => total + (numericAnswers[i] === q.answer ? 1 : 0), 0);
     const completedAt = new Date();
 
+    // Save the response first. The unique userId index prevents duplicate submissions.
     await SurveyResponse.create({
       userId: user._id,
-      answers: answers.map(Number),
+      answers: numericAnswers,
       score,
       submittedAt: completedAt
     });
 
-    user.completed = true;
-    user.score = score;
-    user.completedAt = completedAt;
-    await user.save();
+    await User.updateOne(
+      { _id: user._id, completed: false },
+      { $set: { completed: true, score, completedAt } }
+    );
 
     res.json({
       message: "Survey completed successfully.",
@@ -162,10 +164,15 @@ app.post("/api/survey/submit", auth, async (req, res) => {
       rewardAmount: 200000
     });
   } catch (e) {
-    if (e.code === 11000)
+    if (e?.code === 11000)
       return res.status(409).json({ message: "This survey has already been submitted." });
-    console.error(e);
-    res.status(500).json({ message: "Could not submit the survey. Please try again." });
+    console.error("Survey submission error:", e);
+    const message = e?.name === "ValidationError"
+      ? "Some survey data was invalid. Please refresh the survey and try again."
+      : e?.name === "MongoServerSelectionError"
+        ? "The survey database is temporarily unavailable. Please try again in a moment."
+        : "Could not submit the survey right now. Please try again.";
+    res.status(500).json({ message });
   }
 });
 
@@ -175,7 +182,7 @@ if (fs.existsSync(dist)) {
   app.get("*splat", (req, res) => res.sendFile(path.join(dist, "index.html")));
 }
 
-mongoose.connect(MONGODB_URI)
+mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
   .then(() => {
     console.log("Connected to MongoDB");
     app.listen(PORT, () => console.log(`Bolu Aderoju Initiative survey app running on port ${PORT}`));
