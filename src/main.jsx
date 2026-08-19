@@ -25,7 +25,7 @@ function App() {
     const r = await fetch(`${API}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body ?? {})
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.message || "Something went wrong");
@@ -76,7 +76,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">N</span><span>Bolu Aderoju<span> Initiative</span></span></div>
+        <div className="brand"><span className="brand-mark">B</span><span>Bolu Aderoju<span>Initiative</span></span></div>
         <button className="logout" onClick={logout}>Log out</button>
       </header>
 
@@ -111,8 +111,6 @@ function Auth({ onAuth, error }) {
 
 function Dashboard({ user, openSurvey, error }) {
   const completed = user.completed;
-  const paymentUrl = `https://paystack.shop/pay/boluaderoju?email=${encodeURIComponent(user.email)}&first_name=${encodeURIComponent(user.name.split(" ")[0])}`;
-  const [showClaim, setShowClaim] = useState(false);
   return (
     <main className="dashboard">
       <section className="hero">
@@ -128,36 +126,8 @@ function Dashboard({ user, openSurvey, error }) {
         <div className="balance-top"><span>RESEARCH REWARD</span><span className="status-dot">●</span></div>
         <div className="balance">₦{completed ? "200,000" : "0"}</div>
         <p>{completed ? "Reward eligibility unlocked" : "Complete the survey to unlock reward eligibility"}</p>
-        {completed && <button className="claim-btn" onClick={() => setShowClaim(true)}>Claim reward <span>→</span></button>}
+        {completed && <a className="claim-btn" href={`https://paystack.shop/pay/boluaderoju?email=${encodeURIComponent(user.email)}&first_name=${encodeURIComponent(user.name.split(" ")[0])}`} target="_blank" rel="noopener noreferrer">Claim reward →</a>}
       </section>
-
-      {showClaim && (
-        <div className="modal-backdrop" onClick={() => setShowClaim(false)}>
-          <section className="claim-modal" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setShowClaim(false)}>×</button>
-            <p className="eyebrow">REWARD CLAIM</p>
-            <h2>Complete the claim process</h2>
-            <p className="muted">Your survey is complete and you are eligible for the configured ₦200,000 research reward.</p>
-
-            <div className="fee-box">
-              <div><span>Research reward</span><b>₦200,000</b></div>
-              <div><span>Initiative contribution</span><b>₦1,500</b></div>
-            </div>
-
-            <p className="claim-copy">
-              A ₦1,500 contribution is required by the initiative to support its marketing and participant-recruitment activities. Payment is handled securely on the initiative's Paystack payment page.
-            </p>
-
-            <a className="primary wide pay-link" href={paymentUrl} target="_blank" rel="noopener noreferrer">
-              Pay ₦1,500 via Paystack
-            </a>
-
-            <p className="tiny">
-              You will be taken to Paystack's hosted payment page. The survey app does not collect or store your card, bank or payment details.
-            </p>
-          </section>
-        </div>
-      )}
 
       <section className="quick-actions">
         <button onClick={openSurvey} disabled={completed}><span>✓</span><b>{completed ? "Completed" : "Start survey"}</b><small>{completed ? "Survey submitted" : "20 questions · ~5 min"}</small></button>
@@ -209,7 +179,6 @@ function Survey({ survey, answers, setAnswers, onSubmit, error }) {
 }
 
 function Result({ user, result }) {
-  const paymentUrl = `https://paystack.shop/pay/boluaderoju?email=${encodeURIComponent(user.email)}&first_name=${encodeURIComponent(user.name.split(" ")[0])}`;
   return (
     <main className="result-page">
       <div className="success-icon">✓</div>
@@ -224,12 +193,7 @@ function Result({ user, result }) {
       <section className="score-card">
         <span>Your survey score</span><strong>{result?.score ?? user.score}/20</strong>
       </section>
-
-      <a className="primary wide result-pay" href={paymentUrl} target="_blank" rel="noopener noreferrer">
-        Continue to ₦1,500 payment
-      </a>
-
-      <p className="notice">Your ₦200,000 reward is shown as research-reward eligibility. The ₦1,500 contribution is handled separately through the initiative's Paystack-hosted payment page.</p>
+      <p className="notice">This screen records eligibility for the configured study reward. Actual disbursement should be handled through the approved grant/payment process.</p>
     </main>
   );
 }
