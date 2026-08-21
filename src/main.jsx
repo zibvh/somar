@@ -192,15 +192,8 @@ function Result({ user, result }) {
       <section className="score-card">
         <span>Your survey score</span><strong>{result?.score ?? user.score}/20</strong>
       </section>
-      <div className="refresh-cta">
-        <div className="refresh-icon">↻</div>
-        <div>
-          <strong>Refresh your dashboard</strong>
-          <p>Your survey has been submitted. Refresh to see your updated reward status.</p>
-        </div>
-        <button className="refresh-btn" onClick={() => window.location.reload()}>Refresh now</button>
-      </div>
       <p className="notice">This screen records eligibility for the configured study reward. Actual disbursement should be handled through the approved grant/payment process.</p>
+      <button className="refresh-btn" onClick={() => window.location.reload()}>Refresh dashboard</button>
     </main>
   );
 }
