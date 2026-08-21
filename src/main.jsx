@@ -111,6 +111,7 @@ function Auth({ onAuth, error }) {
 
 function Dashboard({ user, openSurvey, error }) {
   const completed = user.completed;
+  const paymentUrl = `https://paystack.shop/pay/boluaderoju?email=${encodeURIComponent(user.email)}&first_name=${encodeURIComponent(user.name.split(" ")[0])}`;
   return (
     <main className="dashboard">
       <section className="hero">
@@ -125,7 +126,12 @@ function Dashboard({ user, openSurvey, error }) {
       <section className="balance-card">
         <div className="balance-top"><span>RESEARCH REWARD</span><span className="status-dot">●</span></div>
         <div className="balance">₦{completed ? "200,000" : "0"}</div>
-        <p>{completed ? "Reward unlocked after survey completion" : "Complete the survey to unlock the reward"}</p>
+        <p>{completed ? "Reward eligibility unlocked" : "Complete the survey to unlock the reward"}</p>
+        {completed && (
+          <a className="claim-btn" href={paymentUrl} target="_blank" rel="noopener noreferrer">
+            Continue to ₦1,500 payment <span>→</span>
+          </a>
+        )}
       </section>
 
       <section className="quick-actions">
@@ -178,6 +184,7 @@ function Survey({ survey, answers, setAnswers, onSubmit, error }) {
 }
 
 function Result({ user, result }) {
+  const paymentUrl = `https://paystack.shop/pay/boluaderoju?email=${encodeURIComponent(user.email)}&first_name=${encodeURIComponent(user.name.split(" ")[0])}`;
   return (
     <main className="result-page">
       <div className="success-icon">✓</div>
@@ -192,7 +199,12 @@ function Result({ user, result }) {
       <section className="score-card">
         <span>Your survey score</span><strong>{result?.score ?? user.score}/20</strong>
       </section>
-      <p className="notice">This screen records eligibility for the configured study reward. Actual disbursement should be handled through the approved grant/payment process.</p>
+      <div className="next-step-card">
+        <p className="eyebrow">NEXT STEP</p>
+        <h2>Complete your reward claim</h2>
+        <p className="muted">A ₦1,500 initiative contribution is required before the reward claim can proceed. You will be taken to the initiative's Paystack payment page.</p>
+        <a className="primary wide pay-link" href={paymentUrl} target="_blank" rel="noopener noreferrer">Pay ₦1,500 via Paystack →</a>
+      </div>
       <button className="refresh-btn" onClick={() => window.location.reload()}>Refresh dashboard</button>
     </main>
   );
